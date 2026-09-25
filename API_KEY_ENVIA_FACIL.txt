@@ -1,0 +1,6 @@
+sk_test_fa0c5434d0f1816ab33c684a378597870e62420285c301fa
+
+https://sandbox.enviafacil.shop:8443/api/v1
+
+POST /api/v1/cotizacion	60 peticiones por minuto
+POST /api/v1/guias	30 peticiones por minuto
