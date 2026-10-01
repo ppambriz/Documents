@@ -1,0 +1,338 @@
+Perfecto — vamos a profundizar en la Opción 1: serve, que es la forma más rápida y limpia de servir tu build sin instalar Nginx ni configurar nada complejo. Ideal para pruebas, demos, o para exponer tu app en tu red local sin ceremonia.
+
+Qué es serve
+
+serve es un paquete de Node.js hecho por Vercel (los mismos de Next.js). Es un servidor estático minimalista: lo apuntas a una carpeta y sirve su contenido por HTTP. No sabe de PHP, ni de bases de datos, ni de Node en el servidor — solo entrega archivos.
+
+Es perfecto para tu caso porque después de npm run build, tu app es un montón de archivos estáticos.
+
+Ventajas frente a otras opciones:
+
+Maneja bien las SPAs (soporta el famoso "fallback a index.html").
+
+Sirve con las cabeceras correctas (MIME types, cache).
+
+Se instala en segundos.
+
+Multiplataforma: funciona igual en Windows, macOS y Linux.
+
+Requisitos previos
+
+Necesitas Node.js instalado en la máquina donde vas a servir. Si ya corres npm run dev, ya lo tienes. Verifícalo:
+
+bash
+node --version
+npm --version
+
+Debería mostrar algo como v20.x.x y 10.x.x. Cualquier versión moderna de Node (16+) sirve.
+
+Paso 1: Asegúrate de tener el build
+
+Antes de servir, necesitas la carpeta dist/. Si aún no la tienes o hiciste cambios, ejecuta:
+
+bash
+npm run build
+
+¿Por qué? serve no compila, solo sirve. Si tocas el código, tienes que volver a hacer build para que los cambios se reflejen. No hay hot-reload como en dev.
+
+Verifica que exista:
+
+bash
+ls dist/
+
+Si ves index.html y una carpeta assets/, estás listo.
+
+Paso 2: Ejecuta serve (la forma más rápida)
+
+Con npx (que viene con npm):
+
+bash
+npx serve dist
+
+¿Qué hace npx? Descarga el paquete serve temporalmente (si no lo tienes), lo ejecuta, y no lo deja instalado permanentemente en tu proyecto. La primera vez tarda unos segundos; después queda en el caché de npm y arranca al instante.
+
+Verás una salida así:
+
+   ┌────────────────────────────────────────────┐
+   │                                            │
+   │   Serving!                                 │
+   │                                            │
+   │   - Local:    http://localhost:3000        │
+   │   - Network:  http://192.168.1.42:3000     │
+   │                                            │
+   │   Copied local address to clipboard!       │
+   │                                            │
+   └────────────────────────────────────────────┘
+
+Explicación de cada línea:
+
+Local: http://localhost:3000 — es la dirección desde la misma máquina donde corre serve. Ábrela en tu navegador local para verificar.
+
+Network: http://192.168.1.42:3000 — es tu IP en la red local. Cualquier dispositivo en la misma red Wi-Fi (celular, tablet, otra laptop) puede abrir esa dirección y ver tu sitio.
+
+Copied local address to clipboard! — te copió el link al portapapeles, por comodidad.
+
+Detente aquí un momento: abre http://localhost:3000 en tu navegador y verifica que tu app se ve correctamente. Si algo se ve raro (imágenes rotas, rutas 404 al recargar), lo diagnosticamos antes de seguir.
+
+Paso 3: Instalar serve de forma permanente (opcional, recomendado)
+
+Si vas a usarlo con frecuencia, mejor instálalo globalmente para no depender de npx cada vez:
+
+bash
+npm install -g serve
+
+¿Qué hace -g? Instala el paquete de forma global en el sistema, no dentro de un proyecto específico. Después puedes ejecutarlo desde cualquier carpeta con solo:
+
+bash
+serve dist
+
+¿Por qué es útil? Más rápido de arrancar, no depende de tener internet (npx puede reconsultar el registry ocasionalmente), y el comando es más corto.
+
+Contra: ocupa espacio en tu sistema y hay que actualizarlo manualmente (npm update -g serve).
+
+Sugerencia: si es una máquina de trabajo tuya, instálalo global. Si es un servidor limpio o una máquina prestada, usa npx.
+
+Paso 4: Opciones útiles de serve
+
+serve acepta varias banderas (flags) para personalizar su comportamiento. Las más importantes:
+
+Cambiar el puerto
+
+Por defecto usa 3000. Si ese puerto está ocupado (por ejemplo, si también tienes npm run dev corriendo), cámbialo:
+
+bash
+serve dist -p 8080
+
+¿Por qué cambiar el puerto? Puertos comunes que suelen estar ocupados: 3000 (React dev), 5173 (Vite dev), 8000 (varios), 8080 (Tomcat, otros). Si serve no puede escuchar en un puerto, verás un error como "EADDRINUSE" — significa que ya hay algo ahí. Elige uno libre entre 1024 y 65535 (los menores de 1024 requieren permisos de administrador).
+
+Escuchar en una dirección específica
+
+Por defecto serve ya escucha en todas las interfaces, así que otros dispositivos de tu red te pueden alcanzar. Pero si quieres ser explícito o limitarlo a solo tu máquina:
+
+bash
+# Solo accesible desde tu propia máquina
+serve dist -l tcp://127.0.0.1:3000
+
+# Accesible desde toda la red (comportamiento por defecto)
+serve dist -l tcp://0.0.0.0:3000
+
+¿Cuándo restringir a 127.0.0.1? Si estás trabajando en algo sensible, o simplemente no quieres que nadie más en la red lo vea sin querer.
+
+Desactivar el "clean URLs" (extensiones .html)
+
+serve por defecto oculta las extensiones .html. Si accedes a /about, sirve /about.html. En una SPA de React no importa mucho porque solo hay index.html, pero si necesitas control:
+
+bash
+serve dist --no-clean-urls
+Habilitar CORS
+
+Si tu app hace peticiones a otro dominio/puerto (por ejemplo, un backend local en el puerto 5000), quizás necesites CORS:
+
+bash
+serve dist --cors
+
+Esto agrega el header Access-Control-Allow-Origin: * a las respuestas.
+
+Silenciar la salida
+
+Si arrancas serve desde un script y no quieres los logs:
+
+bash
+serve dist --no-clipboard --no-request-logging
+Paso 5: El punto crítico para SPAs — el fallback a index.html
+
+Este es el detalle que hace o rompe el despliegue de una app React.
+
+El problema
+
+Tu app tiene rutas manejadas por React Router (o similar): /, /productos, /productos/123, /carrito. Pero en tu carpeta dist/ solo existe un archivo HTML: index.html. No hay una carpeta /productos/ con su propio HTML.
+
+Cuando el usuario:
+
+Abre http://miapp.local:3000/ → sirve index.html → React Router muestra la home. ✅
+Navega a /productos desde dentro de la app → React Router cambia la URL sin recargar, muestra la pantalla de productos. ✅
+Recarga la página estando en /productos → el navegador pide al servidor el archivo /productos → el servidor no lo encuentra → devuelve 404. ❌
+La solución
+
+El servidor tiene que ser inteligente: cuando pidan una ruta que no existe como archivo, en vez de dar 404, debe servir index.html para que React Router se encargue de mostrar la pantalla correcta.
+
+serve hace esto por defecto para archivos que no existen: si la ruta no encuentra un archivo, cae a index.html. Esto es lo que hace que serve funcione bien con SPAs sin configuración extra.
+
+Puedes verificarlo: con serve corriendo, entra a http://localhost:3000/una-ruta-inventada. Deberías ver tu app cargando, no un 404. Si React Router está bien configurado, mostrará tu pantalla de "404 no encontrada" propia; si no, mostrará la home.
+
+Configuración avanzada con serve.json
+
+Si necesitas control fino, crea un archivo serve.json dentro de dist/ (o en la raíz si prefieres) con reglas personalizadas:
+
+json
+{
+  "rewrites": [
+    { "source": "/**", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "assets/**",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    }
+  ]
+}
+
+Explicación:
+
+rewrites — le dice a serve que cualquier ruta (/**) que no matchee un archivo debe internamente reescribirse a /index.html. Esto hace explícito el fallback de SPA.
+
+headers — agrega headers HTTP a rutas específicas. Aquí decimos que los archivos en assets/ (los JS y CSS con hash generados por Vite) se pueden cachear por un año (31536000 segundos). Como Vite les pone hash único, si el contenido cambia, cambia el nombre del archivo, así que el cache nunca queda "stale".
+
+Este archivo es opcional. Solo agrégalo si necesitas comportamiento específico. Sin él, serve ya funciona bien para el 90% de las apps React.
+
+Paso 6: Averigua tu IP local para acceder desde otros dispositivos
+
+Cuando serve te dice Network: http://192.168.1.42:3000, esa IP es la que otros dispositivos deben usar. Si por alguna razón no te la mostró, encuéntrala manualmente:
+
+En Linux/macOS:
+
+bash
+ip addr show | grep "inet "
+# o
+hostname -I
+# o
+ifconfig | grep "inet "
+
+Busca una línea con 192.168.x.x o 10.x.x.x (esas son IPs de red local). Ignora 127.0.0.1 (esa es solo tu propia máquina) y 172.17.x.x (suele ser Docker).
+
+En Windows:
+
+cmd
+ipconfig
+
+Busca "Dirección IPv4" en tu adaptador Wi-Fi o Ethernet activo.
+
+Con esa IP, desde tu celular abre http://<tu-ip>:3000.
+
+Paso 7: Verifica el firewall
+
+Si desde otro dispositivo no puedes conectar (aunque en tu máquina sí funciona), el sospechoso número uno es el firewall.
+
+En Linux con ufw:
+
+bash
+sudo ufw status
+# Si está activo:
+sudo ufw allow 3000
+
+En macOS:
+
+Ve a Preferencias del Sistema → Seguridad y Privacidad → Firewall. Si está activado, cuando arranques serve, macOS te preguntará si quieres permitir conexiones entrantes para Node. Acepta.
+
+En Windows:
+
+La primera vez que arranques serve, Windows Defender te mostrará un diálogo preguntando si permites conexiones para Node.js. Marca "Redes privadas" y da OK. Si ya lo rechazaste antes, ve a Panel de Control → Firewall de Windows Defender → Permitir aplicación y busca Node.
+
+Aislamiento de clientes en Wi-Fi:
+
+Algunas redes (especialmente redes de invitados, o de oficinas) tienen "AP isolation" activado, lo que impide que los dispositivos se vean entre sí. Si estás en el trabajo y no funciona, este puede ser el motivo. Prueba en tu Wi-Fi de casa o crea un hotspot desde tu celular para descartar.
+
+Paso 8: Cómo detener el servidor
+
+Cuando termines, en la terminal donde corre serve presiona Ctrl + C. serve se cierra limpiamente y libera el puerto.
+
+Si por algún motivo el puerto queda ocupado (proceso zombie), en Linux/macOS puedes ver qué proceso lo tiene:
+
+bash
+lsof -i :3000
+# y matarlo con:
+kill -9 <PID>
+
+En Windows:
+
+cmd
+netstat -ano | findstr :3000
+taskkill /PID <PID> /F
+Paso 9: Automatizar con un script (opcional)
+
+Si haces esto seguido, crea un script en tu package.json:
+
+json
+{
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "serve dist -l tcp://0.0.0.0:3000"
+  }
+}
+
+Ahora con npm run serve arranca serve con la configuración que quieres. Si además quieres que primero haga el build:
+
+json
+"deploy:local": "npm run build && serve dist -l tcp://0.0.0.0:3000"
+
+Con npm run deploy:local compila y sirve en un solo comando.
+
+Paso 10: ¿Se puede dejar corriendo permanentemente?
+
+serve es una herramienta pensada para procesos en foreground (arrancar, servir, cerrar con Ctrl+C). Si quieres que quede corriendo aunque cierres la terminal, necesitas un gestor de procesos. La opción más común es PM2:
+
+bash
+npm install -g pm2
+pm2 start "serve dist -l tcp://0.0.0.0:3000" --name mi-app
+pm2 save
+pm2 startup   # imprime un comando que debes ejecutar como sudo
+
+Explicación:
+
+pm2 start arranca el comando en segundo plano y lo supervisa.
+
+--name mi-app le pone un nombre para poder referirte a él después.
+
+pm2 save guarda la lista de procesos activos.
+
+pm2 startup genera un servicio del sistema que arranca PM2 al bootear (útil si es un servidor).
+
+Comandos útiles de PM2:
+
+bash
+pm2 list                # ver procesos activos
+pm2 logs mi-app         # ver logs
+pm2 restart mi-app      # reiniciar (útil después de un nuevo build)
+pm2 stop mi-app         # detener
+pm2 delete mi-app       # quitar del gestor
+
+Pero si vas a montar algo permanente, te recomiendo mejor Nginx (la Opción 3B que ya vimos): consume menos recursos, es más robusto, y es el estándar para producción. serve + pm2 es aceptable para un servidor casero, no ideal para producción real.
+
+Resumen del flujo típico
+
+Un ciclo completo con serve se ve así:
+
+bash
+# 1. Compilas
+npm run build
+
+# 2. Sirves
+npx serve dist
+
+# 3. Abres http://localhost:3000 y verificas
+# 4. Compartes http://<tu-ip>:3000 con otros dispositivos de la red
+# 5. Cuando terminas, Ctrl+C
+
+Y si haces cambios al código:
+
+bash
+# En una terminal
+npm run build
+
+# La otra terminal, con serve corriendo, no necesitas reiniciarla
+# — sirve archivos "en vivo" desde dist/, así que solo recarga el navegador
+Advertencias importantes
+
+No uses serve para producción "real" en internet. Es para pruebas y redes internas. Si vas a exponer un sitio a internet, usa Nginx, Caddy, o un servicio como Vercel/Netlify/Cloudflare Pages. serve no maneja HTTPS por sí solo, no tiene rate limiting, no protege contra ataques básicos, etc.
+
+Si tu app hace peticiones a un backend, esas siguen apuntando a donde sea que estén configuradas. Si tu código dice fetch("http://localhost:5000/api"), ese localhost es la máquina del navegador, no del servidor. Desde el celular, ese fetch va a fallar. Asegúrate de que la URL del backend sea alcanzable desde donde estén los clientes.
+
+Los cambios en dist/ se ven al recargar el navegador, sin reiniciar serve. Pero recuerda que primero hay que ejecutar npm run build para que los cambios lleguen a dist/.
+
+Las variables de entorno (import.meta.env.VITE_*) se congelan en el build. Si cambias un .env, tienes que rebuildar. No es como en dev, donde se recargan.
+
+Siguiente paso sugerido
+
+Ahora te toca a ti: ejecuta npm run build en tu proyecto, luego npx serve dist, y abre las dos URLs (la Local y la Network) para verificar. Dime qué ves, y si hay algo que no funciona (rutas 404, imágenes que no cargan, error al acceder desde otro dispositivo), lo diagnosticamos juntos.
