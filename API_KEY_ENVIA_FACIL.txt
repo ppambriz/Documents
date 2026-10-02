@@ -4,3 +4,8 @@ https://sandbox.enviafacil.shop:8443/api/v1
 
 POST /api/v1/cotizacion	60 peticiones por minuto
 POST /api/v1/guias	30 peticiones por minuto
+
+
+
+PRODUCCION
+IuvGnpoHRv2kosu-WmhRk_gx_jj3CLwIfWbSaqr45YSMSHDDawnZ2IdjBkuZ_jMr
